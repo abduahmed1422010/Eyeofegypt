@@ -1,0 +1,350 @@
+<!DOCTYPE html>    
+<html lang="ar" dir="rtl">    
+<head>    
+    <meta charset="UTF-8">    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <title>خدمات السائح الرئيسية</title>    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>    
+    <script src="data_config.js"></script>    
+    <style>    
+        body {    
+            background-color: #1e1e2f;    
+            color: #fff;    
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;    
+            margin: 0;    
+            padding: 0;    
+        }    
+        .container {    
+            max-width: 1200px;    
+            margin: auto;    
+            padding: 20px;    
+        }    
+        h1 {    
+            text-align: center;    
+            margin-bottom: 20px;    
+        }    
+        .services-grid {    
+            display: grid;    
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));     
+            gap: 20px;    
+            margin-top: 30px;    
+        }    
+        .service-card {    
+            background-color: #2a2a3f;    
+            padding: 20px;    
+            border-radius: 8px;    
+            text-align: center;    
+            border: 1px solid #555;    
+            cursor: pointer;    
+            transition: background-color 0.3s, border-color 0.3s;    
+            text-decoration: none;    
+            color: #fff;    
+            font-weight: bold;    
+        }    
+        .service-card:hover {    
+            background-color: #3b3b5c;    
+            border-color: gold;    
+        }    
+        .service-card span {    
+            display: block;    
+            font-size: 2em;    
+            margin-bottom: 10px;    
+        }    
+        .service-card.chat-card {    
+            border-color: #4169e1;    
+            background-color: #333d52;    
+        }    
+        .btn-emergency {    
+            position: fixed;    
+            bottom: 20px;    
+            left: 20px;    
+            font-size: 2em;    
+            padding: 10px 15px;    
+            background-color: #ff4d4d;    
+            color: #fff;    
+            border: none;    
+            border-radius: 50%;    
+            cursor: pointer;    
+            z-index: 1000;    
+        }    
+        .header-controls {    
+            display: flex;    
+            justify-content: center;    
+            gap: 15px;    
+            margin-bottom: 20px;    
+            flex-wrap: wrap;    
+        }    
+        .btn-back, .btn-primary {    
+            padding: 10px 15px;    
+            border: none;    
+            border-radius: 6px;    
+            cursor: pointer;    
+            font-weight: bold;    
+        }    
+        .btn-back {    
+            background-color: #555;    
+            color: #fff;    
+        }    
+        .btn-primary {    
+            background-color: #4169e1;    
+            color: #fff;    
+        }    
+        .modal {    
+            position: fixed;    
+            z-index: 2000;    
+            left: 0;    
+            top: 0;    
+            width: 100%;    
+            height: 100%;    
+            overflow: auto;    
+            background-color: rgba(0,0,0,0.7);    
+            display: flex;    
+            justify-content: center;    
+            align-items: center;    
+        }    
+        .modal-content {    
+            background-color: #2a2a3f;    
+            padding: 20px;    
+            border-radius: 8px;    
+            width: 90%;    
+            max-width: 500px;    
+        }    
+        .close-btn {    
+            float: left;    
+            font-size: 1.5em;    
+            font-weight: bold;    
+            cursor: pointer;    
+            color: #fff;    
+        }    
+        .form-group {    
+            margin-bottom: 15px;    
+        }    
+        .form-group label {    
+            display: block;    
+            margin-bottom: 5px;    
+        }    
+        .form-group input, .form-group select, .form-group textarea {    
+            width: 100%;    
+            padding: 8px 10px;    
+            border-radius: 4px;    
+            border: 1px solid #555;    
+            background-color: #1e1e2f;    
+            color: #fff;    
+        }    
+    </style>    
+</head>    
+<body>    
+    <button onclick="handleEmergency()" class="btn-emergency">🚨</button>    
+        
+    <div class="header-controls">    
+        <button onclick="logoutTourist()" class="btn-back" style="background-color: #ff4d4d;">🚪 خروج</button>    
+        <button onclick="openComplaintModal()" class="btn-back" style="background-color: #4169e1;">📝 شكوى / اقتراح</button>    
+    </div>    
+    
+    <div class="container">    
+        <h1>مرحباً بك في مصر! 👋</h1>    
+            
+        <div class="services-grid">    
+            <a href="eye.html" class="service-card">    
+                <span>🗺️</span> المعالم السياحية    
+            </a>    
+            <a href="assistants_cards.html?role=GUIDE" class="service-card">    
+                <span>👤</span> المرشدين السياحيين    
+            </a>    
+            <a href="assistants_cards.html?role=COMPANION" class="service-card">    
+                <span>♿</span> مرافقو ذوي الاحتياجات الخاصة    
+            </a>    
+            <a href="assistants_cards.html?role=DRIVER" class="service-card">    
+                <span>🚗</span> خدمات التنقل (سائقين)    
+            </a>    
+            <a href="hotels.html" class="service-card">    
+                <span>🏨</span> الفنادق القريبة    
+            </a>    
+            <a href="restaurants.html" class="service-card">    
+                <span>🍴</span> المطاعم    
+            </a>    
+            <a href="stores.html" class="service-card">    
+                <span>🛍️</span> المحلات التجارية    
+            </a>    
+            <a href="gemini_chat_bot.html" class="service-card chat-card">    
+                <span>🤖</span> **الشات السياحي**    
+            </a>       
+        </div>    
+    </div>    
+        
+    <div id="complaintModal" class="modal" style="display: none;">    
+        <div class="modal-content">    
+            <span class="close-btn" onclick="closeModal('complaintModal')">×</span>    
+            <h2>📝 شكوى أو اقتراح</h2>    
+            <form id="complaintForm">    
+                <div class="form-group">    
+                    <label for="complaintName">الاسم:</label>    
+                    <input type="text" id="complaintName" required>    
+                </div>    
+                 <div class="form-group">    
+                    <label for="complaintPhone">رقم الهاتف:</label>    
+                    <input type="tel" id="complaintPhone" required>    
+                </div>    
+                <div class="form-group">    
+                    <label for="complaintType">نوع الرسالة:</label>    
+                    <select id="complaintType" required>    
+                        <option value="">-- اختر --</option>    
+                        <option value="شكوى">شكوى</option>    
+                        <option value="اقتراح">اقتراح</option>    
+                    </select>    
+                </div>    
+                <div class="form-group">    
+                    <label for="complaintMessage">التفاصيل:</label>    
+                    <textarea id="complaintMessage" rows="4" required></textarea>    
+                </div>    
+                <button type="submit" class="btn-primary">💾 إرسال الرسالة</button>    
+                <p id="complaintMessageResult" style="margin-top: 10px;"></p>    
+            </form>    
+        </div>    
+    </div>  
+  
+    <div id="emergencyModal" class="modal" style="display:none;">  
+        <div class="modal-content">  
+            <span class="close-btn" onclick="closeModal('emergencyModal')">×</span>  
+            <h2>🚨 بلاغ طارئ</h2>  
+            <form id="emergencyForm">  
+                <div class="form-group">  
+                    <label>الاسم:</label>  
+                    <input type="text" id="emgName" required>  
+                </div>  
+                <div class="form-group">  
+                    <label>رقم الهاتف:</label>  
+                    <input type="tel" id="emgPhone" required>  
+                </div>  
+                <button type="submit" class="btn-primary">📡 إرسال البلاغ</button>  
+                <p id="emgResult" style="margin-top:10px;"></p>  
+            </form>  
+        </div>  
+    </div>  
+    
+    <script>    
+        // --- تحقق من وجود التذكرة ---  
+        const ticket = sessionStorage.getItem('currentTicket');  
+        if(!ticket){  
+            alert("⚠️ يجب تسجيل الدخول أولاً باستخدام كود التذكرة.");  
+            window.location.href = 'index.html';  
+        }  
+  
+        const firebaseConfig = {    
+          apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",    
+          authDomain: "tourguideapp-313c1.firebaseapp.com",    
+          databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",    
+          projectId: "tourguideapp-313c1",    
+          storageBucket: "tourguideapp-313c1.firebasestorage.app",    
+          messagingSenderId: "1036127588385",    
+          appId: "1:1036127588385:web:d144dba8f70fe094395360"    
+        };    
+        firebase.initializeApp(firebaseConfig);    
+        const db = firebase.database();    
+  
+        const saveEmergencyLog = (location) => {    
+            const ticket = sessionStorage.getItem('currentTicket') || 'غير محدد';    
+            const logId = Date.now().toString();    
+            const logData = {    
+                id: logId,    
+                time: new Date().toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' }),    
+                location: location,    
+                status: 'جديد',    
+                ticketCode: ticket    
+            };    
+            db.ref('emergencies/' + logId).set(logData)    
+              .then(() => console.log('✅ بلاغ الطوارئ تم حفظه في Firebase'))    
+              .catch(err => console.error('❌ خطأ في حفظ الطوارئ:', err));    
+        };    
+  
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }    
+        function openComplaintModal() {    
+            document.getElementById('complaintModal').style.display = 'block';    
+            document.getElementById('complaintForm').reset();    
+            document.getElementById('complaintMessageResult').textContent = '';    
+        }    
+        function scrollToBottom() { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }    
+        function handleEmergency() { document.getElementById('emergencyModal').style.display = 'flex'; }  
+  
+        function logoutTourist() {    
+            sessionStorage.removeItem('currentTicket');    
+            window.location.href = 'index.html';    
+        }    
+  
+        /* ================================
+        📌 إرسال الشكوى أو الاقتراح  
+        ================================= */
+        document.getElementById("complaintForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const name = document.getElementById("complaintName").value.trim();
+            const phone = document.getElementById("complaintPhone").value.trim();
+            const type = document.getElementById("complaintType").value;
+            const message = document.getElementById("complaintMessage").value.trim();
+            const result = document.getElementById("complaintMessageResult");
+
+            const id = Date.now().toString();
+
+            const data = {
+                id,
+                name,
+                phone,
+                type,
+                message,
+                ticketCode: sessionStorage.getItem("currentTicket"),
+                time: new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })
+            };
+
+            db.ref("complaints/" + id)
+                .set(data)
+                .then(() => {
+                    result.style.color = "lightgreen";
+                    result.textContent = "✔️ تم إرسال رسالتك بنجاح";
+                })
+                .catch(() => {
+                    result.style.color = "red";
+                    result.textContent = "❌ حدث خطأ أثناء الإرسال";
+                });
+        });
+
+        /* ================================
+        📌 إرسال بلاغ الطوارئ  
+        ================================= */
+        document.getElementById("emergencyForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const name = document.getElementById("emgName").value.trim();
+            const phone = document.getElementById("emgPhone").value.trim();
+            const result = document.getElementById("emgResult");
+
+            const logId = Date.now().toString();
+
+            const logData = {
+                id: logId,
+                name,
+                phone,
+                status: "جديد",
+                ticketCode: sessionStorage.getItem("currentTicket"),
+                time: new Date().toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })
+            };
+
+            db.ref("emergencies/" + logId)
+                .set(logData)
+                .then(() => {
+                    result.style.color = "lightgreen";
+                    result.textContent = "✔️ تم إرسال البلاغ بنجاح";
+
+                    setTimeout(() => {
+                        alert("سيتم تحويلك للاتصال بهذا الرقم الآن: 999");
+                        window.location.href = "tel:999";
+                    }, 800);
+                })
+                .catch(() => {
+                    result.style.color = "red";
+                    result.textContent = "❌ فشل إرسال البلاغ";
+                });
+        });
+    </script>    
+</body>    
+</html>

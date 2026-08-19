@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>لوحة مراجعة طلبات التوظيف</title>
+<style>
+:root {
+    --dark-bg: #1e1e1e;
+    --blue-royal: #128c7e;
+    --gold: #ffa500;
+    --white: #e0e0e0;
+    --yellow-warning: #ffeb3b;
+    --green-success: #4caf50;
+    --red-emergency: #f44336;
+}
+body { font-family: Arial, sans-serif; background-color:#121212; color:var(--white); margin:0; padding:0; }
+.container { max-width: 900px; margin: 30px auto; background-color: var(--dark-bg); padding: 20px; border-radius:10px; box-shadow:0 0 10px #000; }
+
+.tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--gold); }
+.tab-button { padding: 10px 15px; cursor: pointer; background-color: var(--blue-royal); border: none; color: var(--white); font-weight: bold; border-radius: 8px 8px 0 0; margin-left: 5px; transition: background-color 0.3s, color 0.3s; }
+.tab-button.active { background-color: var(--gold); color: var(--dark-bg); border-bottom: 2px solid var(--gold); }
+.tab-content { padding-top: 10px; }
+
+.status-pill { padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; }
+.status-pill.review { background-color: var(--yellow-warning); color: var(--dark-bg); }
+.status-pill.approved { background-color: var(--green-success); color: #000; }
+.status-pill.rejected { background-color: var(--red-emergency); color: #fff; }
+.status-pill.completed { background-color: var(--blue-royal); color: var(--white); }
+
+.btn-sm { padding: 5px 10px; font-size: 0.85em; border-radius: 4px; margin-left: 5px; cursor: pointer; border: none; color: #fff; }
+.header-controls { display:flex; justify-content:flex-start; align-items:center; margin-bottom:15px; }
+.btn-back { background-color:var(--blue-royal); color:var(--white); padding:8px 12px; border-radius:5px; text-decoration:none; font-weight:bold; margin-right:10px; border: none; cursor: pointer; }
+
+/* البوكس الجديد للرسائل */
+#messageBox { display:none; padding:10px 15px; border-radius:5px; margin-bottom:15px; font-weight:bold; text-align:center; }
+#messageBox.info { background-color: var(--blue-royal); color: var(--white); }
+#messageBox.success { background-color: var(--green-success); color: var(--dark-bg); }
+#messageBox.warning { background-color: var(--yellow-warning); color: var(--dark-bg); }
+#messageBox.error { background-color: var(--red-emergency); color: var(--white); }
+
+/* شريط التحميل */
+#loadingBarWrapper {
+    width: 100%;
+    background: #262626;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 15px;
+    display: none;
+    box-sizing: border-box;
+}
+#loadingBar {
+    height: 18px;
+    width: 0%;
+    background: var(--gold);
+    border-radius: 6px;
+    transition: width 0.18s ease;
+}
+#loadingBarText {
+    text-align: center;
+    font-size: 13px;
+    color: var(--white);
+    margin-top: 6px;
+}
+
+/* جدول بسيط */
+.requests-table th, .requests-table td {
+    padding: 8px 10px;
+    text-align: center;
+}
+.requests-table thead th {
+    background: rgba(255,165,0,0.08);
+    color: var(--gold);
+}
+
+/* responsive small screens */
+@media (max-width:720px){
+    .requests-table thead { display:none; }
+    .requests-table tr { display:block; margin-bottom:10px; border-bottom:1px solid #333; }
+    .requests-table td { display:flex; justify-content:space-between; padding:8px 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header-controls">
+    <a href="manager_dashboard.html" class="btn-back">🏠 الرئيسية</a>
+    <button class="btn-back" id="refreshBtn" style="background-color:var(--blue-royal);">🔄 تحديث الطلبات</button>
+</div>
+
+<div class="container">
+    <h1>مراجعة طلبات التوظيف 📝</h1>
+
+    <div id="messageBox"></div>
+
+    <div id="loadingBarWrapper" aria-hidden="true">
+        <div id="loadingBar"></div>
+        <div id="loadingBarText">0%</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" data-tab="review">قيد المراجعة</button>
+        <button class="tab-button" data-tab="accepted">مقبولة (في انتظار الإكمال)</button>
+        <button class="tab-button" data-tab="archive">الأرشيف (مرفوضة / مكتملة)</button>
+    </div>
+
+    <div id="requestsTableContainer" class="tab-content">
+        <table class="requests-table" border="1" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>رقم الطلب</th>
+                    <th>المتقدم</th>
+                    <th>الوظيفة</th>
+                    <th>الحالة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody id="requestsTableBody"></tbody>
+        </table>
+        <p id="noRequestsMessage" style="text-align: center; color: var(--gold); margin-top: 50px; display: none;">لا توجد طلبات في هذا التبويب.</p>
+    </div>
+</div>
+
+<div id="filesModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:9999;">
+    <div style="background-color: var(--dark-bg); padding:20px; border-radius:10px; max-width:90%; max-height:90%; overflow:auto; position:relative;">
+        <button id="closeFilesModalBtn" style="position:absolute; top:10px; right:10px; padding:5px 10px; cursor:pointer;">❌ إغلاق</button>
+        <h2 style="text-align:center; color:var(--gold); margin-bottom:20px;">📑 ملفات الطلب</h2>
+        <div id="filesContainer" style="display:flex; flex-wrap:wrap; gap:15px; justify-content:center;"></div>
+    </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
+  authDomain: "tourguideapp-313c1.firebaseapp.com",
+  databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",
+  projectId: "tourguideapp-313c1",
+  storageBucket: "tourguideapp-313c1.firebasestorage.app",
+  messagingSenderId: "1036127588385",
+  appId: "1:1036127588385:web:d144dba8f70fe094395360"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let currentTab = 'review';
+
+/* Loader و المسجات */
+const loadingWrapper = document.getElementById('loadingBarWrapper');
+const loadingBar = document.getElementById('loadingBar');
+const loadingText = document.getElementById('loadingBarText');
+
+function showLoader() {
+    loadingWrapper.style.display = 'block';
+    setLoading(0);
+    setTimeout(()=> setLoading(10), 50);
+    let fallbackValue = 10;
+    const fallback = setInterval(()=>{
+        fallbackValue = Math.min(90, fallbackValue + 6);
+        setLoading(fallbackValue);
+        if (fallbackValue >= 90) clearInterval(fallback);
+    }, 300);
+    return {
+        finish() {
+            clearInterval(fallback);
+            setLoading(100);
+            setTimeout(()=> { loadingWrapper.style.display = 'none'; }, 400);
+        },
+        set(p){ setLoading(p); }
+    };
+}
+function setLoading(percent){ loadingBar.style.width = percent + '%'; loadingText.textContent = percent + '%'; }
+function showMessage(message, type='info', duration=3000){
+    const box = document.getElementById('messageBox');
+    box.textContent = message;
+    box.className = '';
+    box.classList.add(type);
+    box.style.display = 'block';
+    if(duration>0) setTimeout(()=>{ box.style.display='none'; }, duration);
+}
+
+function getStatusPill(status) {
+    if (!status) return `<span class="status-pill">${status}</span>`;
+    if (status.includes('قيد المراجعة')) return `<span class="status-pill review">${status}</span>`;
+    if (status.includes('تم القبول')) return `<span class="status-pill approved">${status}</span>`;
+    if (status.includes('تم الرفض')) return `<span class="status-pill rejected">${status}</span>`;
+    if (status.includes('تم الاكتمال')) return `<span class="status-pill completed">${status}</span>`;
+    return `<span class="status-pill">${status}</span>`;
+}
+
+function filterRequests(apps) {
+    if (currentTab === 'review') return apps.filter(a => (a.status || '').trim() === 'قيد المراجعة');
+    if (currentTab === 'accepted') return apps.filter(a => (a.status || '').trim() === 'تم القبول');
+    if (currentTab === 'archive') return apps.filter(a => {
+        const s = (a.status || '').trim();
+        return s === 'تم الرفض' || s === 'تم الاكتمال';
+    });
+    return [];
+}
+
+/* ---------------------- عرض الملفات مع زر فتح PDF للسيرة الذاتية ----------------------- */
+function viewFiles(app){
+    const container = document.getElementById("filesContainer");
+    container.innerHTML = '';
+
+    if(!app.files) {
+        const p = document.createElement('p');
+        p.style.color = 'var(--gold)';
+        p.textContent = 'لا توجد ملفات لهذا الطلب.';
+        container.appendChild(p);
+        document.getElementById("filesModal").style.display="flex";
+        return;
+    }
+
+    for(const key in app.files){
+        try {
+            (app.files[key] || []).forEach(fileData=>{
+                const div=document.createElement('div');
+                div.style.textAlign='center';
+                div.style.width='200px';
+                div.style.maxWidth='45%';
+
+                const label=document.createElement('p');
+                const arabicLabel = key
+                    .replace('idFront','الهوية الوطنية وجه')
+                    .replace('idBack','الهوية الوطنية ظهر')
+                    .replace('cv','السيرة الذاتية')
+                    .replace('licenseFront','الرخصة السياحية وجه')
+                    .replace('licenseBack','الرخصة السياحية ظهر')
+                    .replace('companionCard','كارنيه المرافق')
+                    .replace('driverLicenseFront','رخصة القيادة وجه')
+                    .replace('driverLicenseBack','رخصة القيادة ظهر');
+                label.textContent = arabicLabel;
+                label.style.color='var(--gold)';
+                label.style.fontWeight='bold';
+                label.style.marginBottom='5px';
+
+                if(key==='cv'){
+                    // إذا كانت السيرة الذاتية، نعرض زر لفتح PDF بدل الصورة
+                    const btn = document.createElement('button');
+                    btn.textContent='📄 فتح السيرة الذاتية';
+                    btn.style.padding='8px 12px';
+                    btn.style.borderRadius='6px';
+                    btn.style.backgroundColor='var(--blue-royal)';
+                    btn.style.color='#fff';
+                    btn.style.cursor='pointer';
+                    btn.onclick=()=>window.open(fileData,"_blank");
+                    div.appendChild(label);
+                    div.appendChild(btn);
+                } else {
+                    const img=document.createElement('img');
+                    img.src=fileData;
+                    img.style.width='100%';
+                    img.style.border='1px solid #ccc';
+                    img.style.borderRadius='6px';
+                    img.style.objectFit='cover';
+                    div.appendChild(label);
+                    div.appendChild(img);
+                }
+
+                container.appendChild(div);
+            });
+        } catch(e){
+            console.warn('file render error', e);
+        }
+    }
+
+    document.getElementById("filesModal").style.display="flex";
+}
+
+/* ---------------------- بناء الجدول ----------------------- */
+async function displayRequests() {
+    const loader = showLoader();
+
+    try {
+        const snapshot = await get(ref(db, 'jobApplications'));
+        const data = snapshot.val() || {};
+        const entries = Object.entries(data).map(([appKey, value])=> ({ appKey, ...value }));
+        const filtered = filterRequests(entries);
+
+        const tbody = document.getElementById('requestsTableBody');
+        const noRequestsMessage = document.getElementById('noRequestsMessage');
+        tbody.innerHTML = '';
+
+        if(filtered.length === 0){
+            noRequestsMessage.style.display = 'block';
+            loader.finish();
+            return;
+        }
+        noRequestsMessage.style.display = 'none';
+
+        const total = filtered.length;
+        let processed = 0;
+        loader.set(10);
+
+        filtered.forEach(app => {
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+                <td>رقم الطلب : ${app.id || '-'}</td>
+                <td>اسم المتقدم : ${app.fullName || '-'}</td>
+                <td> الوظيفه: ${app.roleKey || app.role || '-'}</td>
+                <td>حاله الطلب : ${getStatusPill(app.status)}</td>
+            `;
+
+            const tdActions = document.createElement('td');
+
+            const viewBtn=document.createElement('button');
+            viewBtn.className='btn-sm';
+            viewBtn.style.backgroundColor='var(--blue-royal)';
+            viewBtn.textContent='📂 عرض الملفات';
+            viewBtn.onclick=()=>viewFiles(app);
+
+            const acceptBtn=document.createElement('button');
+            acceptBtn.className='btn-sm';
+            acceptBtn.style.backgroundColor='var(--green-success)';
+            acceptBtn.textContent='✅ قبول';
+            acceptBtn.onclick = async ()=>{
+                if(confirm('هل أنت متأكد من قبول الطلب؟')){
+                    showMessage('جارٍ قبول الطلب...', 'info');
+                    await update(ref(db,'jobApplications/'+app.appKey),{status:'تم القبول'});
+                    showMessage('تم قبول الطلب بنجاح ✅', 'success', 2000);
+                    displayRequests();
+                }
+            };
+
+            const rejectBtn=document.createElement('button');
+            rejectBtn.className='btn-sm';
+            rejectBtn.style.backgroundColor='var(--red-emergency)';
+            rejectBtn.textContent='❌ رفض';
+            rejectBtn.onclick = async ()=>{
+                if(confirm('هل أنت متأكد من رفض الطلب؟')){
+                    showMessage('جارٍ رفض الطلب...', 'info');
+                    await update(ref(db,'jobApplications/'+app.appKey),{status:'تم الرفض'});
+                    showMessage('تم رفض الطلب ❌', 'error', 2000);
+                    displayRequests();
+                }
+            };
+
+            const deleteBtn=document.createElement('button');
+            deleteBtn.className='btn-sm';
+            deleteBtn.style.backgroundColor='#555';
+            deleteBtn.textContent='🗑️ حذف';
+            deleteBtn.onclick = async ()=>{
+                if(confirm('هل أنت متأكد من حذف الطلب؟')){
+                    showMessage('جارٍ حذف الطلب...', 'info');
+                    await remove(ref(db,'jobApplications/'+app.appKey));
+                    showMessage('تم حذف الطلب 🗑️', 'warning', 1500);
+                    displayRequests();
+                }
+            };
+
+            if((app.status || '').trim() === 'قيد المراجعة'){
+                tdActions.append(acceptBtn, rejectBtn, deleteBtn, viewBtn);
+            } else {
+                tdActions.append(deleteBtn, viewBtn);
+            }
+
+            tr.appendChild(tdActions);
+            tbody.appendChild(tr);
+
+            processed++;
+            const percent = Math.min(90, 10 + Math.floor((processed / total) * 80));
+            loader.set(percent);
+        });
+
+        setTimeout(()=> loader.finish(), 180);
+
+    } catch (err) {
+        console.error('displayRequests error', err);
+        showMessage('حدث خطأ أثناء جلب البيانات. افتح الكونسول للمزيد.', 'error', 5000);
+        setTimeout(()=> { try { loadingBar.style.width = '100%'; loadingText.textContent = '100%'; loadingWrapper.style.display = 'none'; } catch(e){} }, 300);
+    }
+}
+
+/* ---------------------- أحداث الصفحة ----------------------- */
+document.getElementById("refreshBtn").onclick = displayRequests;
+document.getElementById("closeFilesModalBtn").onclick = ()=> document.getElementById("filesModal").style.display="none";
+
+document.querySelectorAll('.tab-button').forEach(btn=>{
+    btn.onclick=()=>{
+        currentTab = btn.dataset.tab;
+        document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        displayRequests();
+    };
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+    displayRequests();
+    setInterval(displayRequests,60000);
+});
+</script>
+</body>
+</html>

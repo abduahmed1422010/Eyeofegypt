@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استكمال بيانات الملف الشخصي</title>
+<style>
+:root {
+    --dark-bg: #121212;
+    --card-bg: #1f1f1f;
+    --gold: #ffc107;
+    --blue-royal: #4a6fa5;
+    --white: #e0e0e0;
+    --border-color: #333333;
+    --red-emergency: #cf6679;
+    --green-success: #4caf50;
+    --yellow-warning: #ffeb3b;
+    --text-color: #e0e0e0;
+}
+body {
+    background-color: var(--dark-bg); 
+    color: var(--text-color); 
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    margin:0; padding:0; direction:rtl;
+}
+.header-controls {display:flex; justify-content:flex-end; padding:15px; background-color:#1f1f1f; border-bottom:1px solid var(--border-color);}
+.btn-back {background-color:var(--blue-royal); color:#fff; padding:8px 15px; border-radius:6px; text-decoration:none; font-size:0.9em; transition:background-color 0.3s; border:none; cursor:pointer; margin-left:10px;}
+.profile-form-container {max-width: 600px; margin: 40px auto; padding: 30px; background-color: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border:1px solid var(--gold);}
+.profile-img-container {display:flex; justify-content:center; margin-bottom:20px;}
+.profile-img-preview {width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid var(--blue-royal);background-color:#333;}
+input,textarea,select{width:100%; padding:12px; border:1px solid var(--blue-royal); border-radius:6px; background-color:#2a2a2a; color:var(--white); font-size:1em; transition:border-color 0.3s,box-shadow 0.3s;}
+input:focus,textarea:focus,select:focus{border-color:var(--gold); box-shadow:0 0 8px rgba(255,193,7,0.5); outline:none;}
+button{cursor:pointer;}
+.btn-login{margin-top:15px; padding:8px 12px; background-color:var(--blue-royal); color:#fff; border:none; border-radius:6px;}
+.btn-login:hover{background-color:#3b5b82;}
+.btn-submit{margin-top:30px; width:100%; padding:10px; background-color: var(--gold); border:none; border-radius:6px; color:var(--dark-bg); font-weight:bold;}
+.btn-submit:hover{background-color:#e0a800;}
+#statusBox{padding:15px; margin-top:15px; text-align:center; font-weight:bold; border-radius:6px; display:none;}
+</style>
+</head>
+<body>
+<div class="header-controls">
+    <a href="index.html" class="btn-back">🔙 الصفحة الرئيسية</a>
+</div>
+
+<div class="profile-form-container">
+    <h1 id="pageTitle">استكمال البيانات الشخصية</h1>
+    <p id="roleInfo" style="color: var(--blue-royal); font-weight: bold;"></p>
+    
+    <form id="completionForm">
+        <div class="profile-img-container">
+            <img id="imagePreview" class="profile-img-preview" src="images/guide_man.png" alt="صورة شخصية">
+        </div>
+        <div class="form-group">
+            <label for="profilePicture">👤 صورة شخصية:</label>
+            <input type="file" id="profilePicture" accept="image/*" required>
+        </div>
+        <div class="form-group">
+            <label for="fullName">الاسم (يملأ تلقائياً):</label>
+            <input type="text" id="fullName" readonly style="background-color:#333;" required>
+        </div>
+        <div class="form-group">
+            <label for="age">العمر:</label>
+            <input type="number" id="age" required>
+        </div>
+        <div class="form-group">
+            <label for="experience">سنوات الخبرة:</label>
+            <input type="number" id="experience" required>
+        </div>
+        <div id="roleSpecificFields"></div>
+        <div class="form-group">
+            <label for="about">نبذة مختصرة عنك (ستظهر للسائح):</label>
+            <textarea id="about" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn-submit">✅ إرسال البيانات</button>
+    </form>
+
+    <div id="statusBox"></div> <!-- البوكس أسفل الزر -->
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
+  authDomain: "tourguideapp-313c1.firebaseapp.com",
+  databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",
+  projectId: "tourguideapp-313c1",
+  storageBucket: "tourguideapp-313c1.appspot.com",
+  messagingSenderId: "1036127588385",
+  appId: "1:1036127588385:web:d144dba8f70fe094395360"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ROLES = {
+    GUIDE: {key:"GUIDE", name:"مرشد سياحي"},
+    COMPANION: {key:"COMPANION", name:"مرافق لذوي الاحتياجات الخاصة"},
+    DRIVER: {key:"DRIVER", name:"سائق نقل خاص"}
+};
+
+const urlParams = new URLSearchParams(window.location.search);
+const roleKey = urlParams.get('role');
+const appId = urlParams.get('appId'); // سيستخدم للchat والتعليقات
+let currentApp = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if(!roleKey || !appId){
+        const statusBox = document.getElementById('statusBox');
+        statusBox.style.display='block';
+        statusBox.style.backgroundColor='var(--red-emergency)';
+        statusBox.textContent='❌ خطأ: لم يتم تحديد الدور أو رقم الطلب.';
+        document.getElementById('completionForm').style.display='none';
+        return;
+    }
+
+    try{
+        const snapshot = await get(ref(db, 'jobApplications'));
+        if(snapshot.exists()){
+            const apps = snapshot.val();
+            currentApp = Object.values(apps).find(app => app.id === appId);
+            if(!currentApp) throw new Error('❌ لم يتم العثور على الطلب في النظام.');
+            document.getElementById('fullName').value = currentApp.fullName || 'غير معروف';
+            document.getElementById('pageTitle').textContent = `استكمال بيانات: ${ROLES[roleKey].name}`;
+            document.getElementById('roleInfo').textContent = `رقم الطلب: ${appId}`;
+            renderRoleFields(roleKey);
+        } else throw new Error('❌ لا توجد بيانات في النظام.');
+    }catch(err){
+        const statusBox = document.getElementById('statusBox');
+        statusBox.style.display='block';
+        statusBox.style.backgroundColor='var(--red-emergency)';
+        statusBox.textContent = err.message;
+        document.getElementById('completionForm').style.display='none';
+    }
+});
+
+function previewImage(file){
+    return new Promise((resolve)=>{
+        const reader = new FileReader();
+        reader.onload=function(){ 
+            document.getElementById('imagePreview').src=reader.result;
+            resolve(reader.result);
+        }
+        reader.readAsDataURL(file);
+    });
+}
+
+document.getElementById('profilePicture').addEventListener('change', async (e)=>{
+    await previewImage(e.target.files[0]);
+});
+
+function renderRoleFields(roleKey){
+    const container=document.getElementById('roleSpecificFields');
+    let fieldsHTML='';
+    switch(roleKey){
+        case ROLES.GUIDE.key:
+            fieldsHTML=`<div class="form-group"><label for="guideType">نوع الإرشاد:</label>
+            <select id="guideType" required>
+            <option value="">-- اختر نوع الإرشاد --</option>
+            <option value="ثقافي">ثقافي</option>
+            <option value="ترفيهي">ترفيهي</option>
+            <option value="ديني">ديني</option>
+            <option value="تجاري">تجاري</option>
+            <option value="اخرى">أخرى</option>
+            </select></div>
+            <div class="form-group"><label for="groupLimit">عدد المجموعة الأقصى:</label>
+            <input type="number" id="groupLimit"></div>
+            <div class="form-group"><label for="price">سعر اليوم:</label>
+            <input type="number" id="price"></div>`;
+            break;
+        case ROLES.COMPANION.key:
+            fieldsHTML=`<div class="form-group"><label for="specialization">التخصص:</label>
+            <select id="specialization" required>
+            <option value="">-- اختر التخصص --</option>
+            <option value="سمعي">سمعي</option>
+            <option value="بصري">بصري</option>
+            <option value="حركي">حركي</option>
+            <option value="كبار سن">كبار سن</option>
+            <option value="متعدد">متعدد</option>
+            </select></div>
+            <div class="form-group"><label for="priceDay">سعر اليوم:</label>
+            <input type="number" id="priceDay"></div>
+            <div class="form-group"><label for="priceHour">سعر الساعة:</label>
+            <input type="number" id="priceHour"></div>`;
+            break;
+        case ROLES.DRIVER.key:
+            fieldsHTML=`<div class="form-group"><label for="cityPrice">أجرة المدينة:</label>
+            <input type="number" id="cityPrice"></div>
+            <div class="form-group"><label for="outCityPrice">أجرة خارج المدينة:</label>
+            <input type="number" id="outCityPrice"></div>`;
+            break;
+    }
+    container.innerHTML=fieldsHTML;
+}
+
+document.getElementById('completionForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    submitButton.disabled=true;
+
+    const statusBox = document.getElementById('statusBox');
+    statusBox.style.display='block';
+    statusBox.style.backgroundColor='var(--blue-royal)';
+    statusBox.textContent='⏳ جاري معالجة البيانات...';
+
+    try{
+        if(!appId) throw new Error('❌ رقم الطلب غير موجود.');
+
+        const fileInput = document.getElementById('profilePicture');
+        const imgDataURL = await previewImage(fileInput.files[0]);
+
+        let assistantData={
+            appId: appId,
+            name: document.getElementById('fullName').value.trim(),
+            age: parseInt(document.getElementById('age').value),
+            experience: parseInt(document.getElementById('experience').value),
+            about: document.getElementById('about').value.trim(),
+            img: imgDataURL
+        };
+
+        switch(roleKey){
+            case ROLES.GUIDE.key:
+                assistantData.guideType=document.getElementById('guideType').value;
+                assistantData.groupLimit=parseInt(document.getElementById('groupLimit').value)||0;
+                assistantData.price=parseInt(document.getElementById('price').value)||0;
+                break;
+            case ROLES.COMPANION.key:
+                assistantData.specialization=document.getElementById('specialization').value;
+                assistantData.priceDay=parseInt(document.getElementById('priceDay').value)||0;
+                assistantData.priceHour=parseInt(document.getElementById('priceHour').value)||0;
+                break;
+            case ROLES.DRIVER.key:
+                assistantData.cityPrice=parseInt(document.getElementById('cityPrice').value)||0;
+                assistantData.outCityPrice=parseInt(document.getElementById('outCityPrice').value)||0;
+                break;
+        }
+
+        const pathMap = {
+            [ROLES.GUIDE.key]: 'assistants_guides',
+            [ROLES.COMPANION.key]: 'assistants_companions',
+            [ROLES.DRIVER.key]: 'assistants_drivers'
+        };
+        const dbPath = pathMap[roleKey];
+
+        await set(ref(db, `${dbPath}/${appId}`), assistantData);
+
+        // تحديث حالة الطلب
+        const appsSnapshot = await get(ref(db,'jobApplications'));
+        if(appsSnapshot.exists()){
+            const appsData = appsSnapshot.val();
+            const appKey = Object.keys(appsData).find(k => appsData[k].id===appId);
+            if(appKey) await update(ref(db,'jobApplications/'+appKey), {status:'تم الاكتمال'});
+        }
+
+        statusBox.style.backgroundColor='var(--green-success)';
+        statusBox.innerHTML=`  ✅ تم استكمال البيانات بنجاح.<br>
+        ⚠️ الكود الخاص بك للشات: <strong>${appId}<br><button class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>`;
+    }catch(err){
+        statusBox.style.backgroundColor='var(--red-emergency)';
+        statusBox.textContent='❌ حدث خطأ أثناء حفظ البيانات: '+err.message;
+        console.error(err);
+    }finally{
+        submitButton.disabled=false;
+    }
+});
+
+function goToAssistantLogin(){
+    window.location.href='assistant_login.html';
+}
+</script>
+</body>
+</html>
